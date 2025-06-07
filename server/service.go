@@ -285,7 +285,7 @@ func NewService(cfg *v1.ServerConfig) (*Service, error) {
 		svr.rc.HTTPReverseProxy = rp
 
 		address := net.JoinHostPort(cfg.ProxyBindAddr, strconv.Itoa(cfg.VhostHTTPPort))
-		server := &http.Server{
+		svr.rc.VhostHTTPServer = &http.Server{
 			Addr:              address,
 			Handler:           rp,
 			ReadHeaderTimeout: 60 * time.Second,
@@ -300,7 +300,7 @@ func NewService(cfg *v1.ServerConfig) (*Service, error) {
 			}
 		}
 		go func() {
-			_ = server.Serve(l)
+			_ = svr.rc.VhostHTTPServer.Serve(l)
 		}()
 		log.Infof("http service listen on %s", address)
 	}

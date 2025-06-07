@@ -22,6 +22,7 @@ import (
 	"github.com/SianHH/frp-package/server/group"
 	"github.com/SianHH/frp-package/server/ports"
 	"github.com/SianHH/frp-package/server/visitor"
+	"net/http"
 )
 
 // All resource managers and controllers
@@ -50,6 +51,8 @@ type ResourceController struct {
 	// For HTTPS proxies, route requests to different clients by hostname and other information
 	VhostHTTPSMuxer *vhost.HTTPSMuxer
 
+	VhostHTTPServer *http.Server
+
 	// Controller for nat hole connections
 	NatHoleController *nathole.Controller
 
@@ -61,8 +64,8 @@ type ResourceController struct {
 }
 
 func (rc *ResourceController) Close() error {
-	if rc.VhostHTTPSMuxer != nil {
-		rc.VhostHTTPSMuxer.Close()
+	if rc.VhostHTTPServer != nil {
+		rc.VhostHTTPServer.Close()
 	}
 	if rc.VhostHTTPSMuxer != nil {
 		rc.VhostHTTPSMuxer.Close()
