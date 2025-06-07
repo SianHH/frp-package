@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-type service interface {
+type Service interface {
 	Start() error
 	Stop()
 	Wait()
@@ -13,7 +13,7 @@ type service interface {
 
 var register = sync.Map{}
 
-func Set(name string, svc service) error {
+func Set(name string, svc Service) error {
 	if _, ok := register.Load(name); ok {
 		return errors.New("already exists")
 	}
@@ -21,10 +21,10 @@ func Set(name string, svc service) error {
 	return nil
 }
 
-func Get(name string) service {
+func Get(name string) Service {
 	value, ok := register.Load(name)
 	if ok {
-		return value.(service)
+		return value.(Service)
 	}
 	return nil
 }
@@ -32,7 +32,7 @@ func Get(name string) service {
 func Del(name string) {
 	value, ok := register.Load(name)
 	if ok {
-		value.(service).Stop()
+		value.(Service).Stop()
 		register.Delete(name)
 	}
 }
