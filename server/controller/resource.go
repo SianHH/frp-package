@@ -64,6 +64,9 @@ func (rc *ResourceController) Close() error {
 	if rc.VhostHTTPSMuxer != nil {
 		rc.VhostHTTPSMuxer.Close()
 	}
+	if rc.VhostHTTPSMuxer != nil {
+		rc.VhostHTTPSMuxer.Close()
+	}
 	if rc.TCPMuxHTTPConnectMuxer != nil {
 		rc.TCPMuxHTTPConnectMuxer.Close()
 	}
