@@ -36,3 +36,15 @@ func Del(name string) {
 		register.Delete(name)
 	}
 }
+
+func Range(f func(key string, value Service)) {
+	var tempMap = make(map[string]Service)
+	register.Range(func(key, value any) bool {
+		service := value.(Service)
+		tempMap[key.(string)] = service
+		return true
+	})
+	for k, v := range tempMap {
+		f(k, v)
+	}
+}

@@ -16,12 +16,12 @@ func main() {
 		ServerAddr: "127.0.0.1",
 		ServerPort: 7000,
 		Transport: v1.ClientTransportConfig{
-			Protocol: "tcp",
+			Protocol: "websocket",
 		},
 	}, []v1.ProxyConfigurer{
 		&v1.HTTPProxyConfig{
 			ProxyBaseConfig: v1.ProxyBaseConfig{
-				Name:        "111",
+				Name:        "",
 				Type:        "http",
 				Annotations: nil,
 				Transport: v1.ProxyTransport{
