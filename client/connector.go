@@ -17,6 +17,7 @@ package client
 import (
 	"context"
 	"crypto/tls"
+	"github.com/SianHH/frp-package/pkg/util/bbr"
 	"io"
 	"net"
 	"strconv"
@@ -24,9 +25,9 @@ import (
 	"sync"
 	"time"
 
+	quic "github.com/apernet/quic-go"
 	libnet "github.com/fatedier/golib/net"
 	fmux "github.com/hashicorp/yamux"
-	quic "github.com/quic-go/quic-go"
 	"github.com/samber/lo"
 
 	v1 "github.com/SianHH/frp-package/pkg/config/v1"
@@ -101,6 +102,8 @@ func (c *defaultConnectorImpl) Open() error {
 			return err
 		}
 		c.quicConn = conn
+		bbr.UseBBR(c.quicConn)
+		//brutal.UseBrutal(c.quicConn, 20*1024*1024*8)
 		return nil
 	}
 

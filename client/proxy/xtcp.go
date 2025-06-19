@@ -22,8 +22,8 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/apernet/quic-go"
 	fmux "github.com/hashicorp/yamux"
-	"github.com/quic-go/quic-go"
 
 	v1 "github.com/SianHH/frp-package/pkg/config/v1"
 	"github.com/SianHH/frp-package/pkg/msg"

@@ -1,0 +1,39 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: frps
+    env:
+      - CGO_ENABLED=0
+    targets:
+      - linux_amd64
+      - windows_amd64
+      - freebsd_amd64
+    ldflags:
+      - -s
+      - -w
+    binary: >-
+      frps
+    main: ./cmd/frps/.
+  - id: frpc
+    env:
+      - CGO_ENABLED=0
+    targets:
+      - linux_amd64
+      - windows_amd64
+      - freebsd_amd64
+    ldflags:
+      - -s
+      - -w
+    binary: >-
+      frpc
+    main: ./cmd/frpc/.
+archives:
+  - format: tar.gz
+    name_template: "{{ .Target }}"
+    format_overrides:
+      - goos: windows
+        format: zip

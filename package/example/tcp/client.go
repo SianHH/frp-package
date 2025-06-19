@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	svc := frpc.NewService(v1.ClientCommonConfig{
+	svc, _ := frpc.NewService(v1.ClientCommonConfig{
 		Auth: v1.AuthClientConfig{
 			Token: "123123123",
 		},
@@ -16,7 +16,7 @@ func main() {
 		ServerAddr: "127.0.0.1",
 		ServerPort: 7000,
 		Transport: v1.ClientTransportConfig{
-			Protocol: "tcp",
+			Protocol: "quic",
 		},
 	}, []v1.ProxyConfigurer{
 		&v1.TCPProxyConfig{
@@ -28,7 +28,7 @@ func main() {
 					UseEncryption:  true,
 					UseCompression: true,
 					BandwidthLimit: func() types.BandwidthQuantity {
-						quantity, _ := types.NewBandwidthQuantity("128KB")
+						quantity, _ := types.NewBandwidthQuantity("0KB")
 						return quantity
 					}(),
 					BandwidthLimitMode:   "client",

@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	svc := frpc.NewService(v1.ClientCommonConfig{
+	svc, _ := frpc.NewService(v1.ClientCommonConfig{
 		Auth: v1.AuthClientConfig{
 			Token: "123123123",
 		},
@@ -16,7 +16,7 @@ func main() {
 		ServerAddr: "127.0.0.1",
 		ServerPort: 7000,
 		Transport: v1.ClientTransportConfig{
-			Protocol: "websocket",
+			Protocol: "quic",
 		},
 	}, []v1.ProxyConfigurer{
 		&v1.HTTPProxyConfig{

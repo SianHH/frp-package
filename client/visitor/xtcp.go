@@ -24,9 +24,9 @@ import (
 	"sync"
 	"time"
 
+	quic "github.com/apernet/quic-go"
 	libio "github.com/fatedier/golib/io"
 	fmux "github.com/hashicorp/yamux"
-	quic "github.com/quic-go/quic-go"
 	"golang.org/x/time/rate"
 
 	v1 "github.com/SianHH/frp-package/pkg/config/v1"

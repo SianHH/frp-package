@@ -7,14 +7,14 @@ import (
 )
 
 func main() {
-	svc := frps.NewService(v1.ServerConfig{
+	svc, _ := frps.NewService(v1.ServerConfig{
 		Auth: v1.AuthServerConfig{
 			Token: "123123123",
 		},
 		BindAddr:      "0.0.0.0",
 		BindPort:      7000,
 		KCPBindPort:   0,
-		QUICBindPort:  0,
+		QUICBindPort:  7000,
 		VhostHTTPPort: 18080,
 		HTTPPlugins:   nil,
 	})

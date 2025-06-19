@@ -19,6 +19,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/SianHH/frp-package/pkg/util/bbr"
 	"io"
 	"net"
 	"net/http"
@@ -26,10 +27,10 @@ import (
 	"strconv"
 	"time"
 
+	quic "github.com/apernet/quic-go"
 	"github.com/fatedier/golib/crypto"
 	"github.com/fatedier/golib/net/mux"
 	fmux "github.com/hashicorp/yamux"
-	quic "github.com/quic-go/quic-go"
 	"github.com/samber/lo"
 
 	"github.com/SianHH/frp-package/pkg/auth"
@@ -549,6 +550,8 @@ func (svr *Service) HandleQUICListener(l *quic.Listener) {
 			log.Warnf("quic listener for incoming connections from client closed")
 			return
 		}
+		bbr.UseBBR(c)
+
 		// Start a new goroutine to handle connection.
 		go func(ctx context.Context, frpConn quic.Connection) {
 			for {
