@@ -573,18 +573,16 @@ func (svr *Service) HandleQUICListener(l *quic.Listener) {
 					_ = frpConn.CloseWithError(0, "")
 					return
 				}
-				// --- 主动探测防御 ---
+				// --- 主动探测防御内容校验放宽，仅日志提示 ---
 				buf := make([]byte, 8)
 				stream.SetReadDeadline(time.Now().Add(2 * time.Second))
 				n, _ := stream.Read(buf)
 				stream.SetReadDeadline(time.Time{})
 				if n < 4 || string(buf[:4]) != "GET " {
-					log.Warnf("[QUIC防御] 非法或探测流量，已拒绝: %q", buf[:n])
-					stream.Close()
-					continue
+					log.Warnf("[QUIC防御-宽松] 可疑或探测流量: %q，已放行", buf[:n])
+					// 不再关闭流，继续处理
 				}
 				// --- END ---
-				// 继续正常处理
 				go svr.handleConnection(ctx, netpkg.QuicStreamToNetConn(stream, frpConn), false)
 			}
 		}(context.Background(), c)
