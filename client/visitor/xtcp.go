@@ -16,6 +16,7 @@ package visitor
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -416,7 +417,18 @@ func (qs *QUICTunnelSession) Init(listenConn *net.UDPConn, raddr *net.UDPAddr) e
 	if err != nil {
 		return fmt.Errorf("create tls config error: %v", err)
 	}
-	tlsConfig.NextProtos = []string{"frp"}
+	tlsConfig.NextProtos = []string{"h3", "http/1.1"} // 伪装为常见HTTPS协议
+	tlsConfig.ServerName = "www.bing.com"             // 伪装SNI为常见域名
+	// 可选：伪装CipherSuites和CurvePreferences为主流浏览器
+	tlsConfig.CipherSuites = []uint16{
+		tls.TLS_AES_128_GCM_SHA256,
+		tls.TLS_AES_256_GCM_SHA384,
+		tls.TLS_CHACHA20_POLY1305_SHA256,
+	}
+	tlsConfig.CurvePreferences = []tls.CurveID{
+		tls.X25519,
+		tls.CurveP256,
+	}
 	quicConn, err := quic.Dial(context.Background(), listenConn, raddr, tlsConfig,
 		&quic.Config{
 			MaxIdleTimeout:     time.Duration(qs.clientCfg.Transport.QUIC.MaxIdleTimeout) * time.Second,
@@ -426,6 +438,16 @@ func (qs *QUICTunnelSession) Init(listenConn *net.UDPConn, raddr *net.UDPAddr) e
 	if err != nil {
 		return fmt.Errorf("dial quic error: %v", err)
 	}
+	// --- HTTP/3内容混淆 ---
+	go func() {
+		stream, err := quicConn.OpenStreamSync(context.Background())
+		if err == nil {
+			fakeReq := "GET / HTTP/3.0\r\nHost: www.bing.com\r\nUser-Agent: Mozilla/5.0\r\nAccept: */*\r\n\r\n"
+			stream.Write([]byte(fakeReq))
+			stream.Close()
+		}
+	}()
+	// --- END ---
 	qs.mu.Lock()
 	qs.session = quicConn
 	qs.listenConn = listenConn

@@ -19,13 +19,14 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/SianHH/frp-package/pkg/util/bbr"
 	"io"
 	"net"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/SianHH/frp-package/pkg/util/bbr"
 
 	quic "github.com/apernet/quic-go"
 	"github.com/fatedier/golib/crypto"
@@ -250,7 +251,18 @@ func NewService(cfg *v1.ServerConfig) (*Service, error) {
 	if cfg.QUICBindPort > 0 {
 		address := net.JoinHostPort(cfg.BindAddr, strconv.Itoa(cfg.QUICBindPort))
 		quicTLSCfg := tlsConfig.Clone()
-		quicTLSCfg.NextProtos = []string{"frp"}
+		quicTLSCfg.NextProtos = []string{"h3", "http/1.1"} // 伪装为常见HTTPS协议
+		quicTLSCfg.ServerName = "www.bing.com"             // 伪装SNI为常见域名
+		// 可选：伪装CipherSuites和CurvePreferences为主流浏览器
+		quicTLSCfg.CipherSuites = []uint16{
+			tls.TLS_AES_128_GCM_SHA256,
+			tls.TLS_AES_256_GCM_SHA384,
+			tls.TLS_CHACHA20_POLY1305_SHA256,
+		}
+		quicTLSCfg.CurvePreferences = []tls.CurveID{
+			tls.X25519,
+			tls.CurveP256,
+		}
 		svr.quicListener, err = quic.ListenAddr(address, quicTLSCfg, &quic.Config{
 			MaxIdleTimeout:     time.Duration(cfg.Transport.QUIC.MaxIdleTimeout) * time.Second,
 			MaxIncomingStreams: int64(cfg.Transport.QUIC.MaxIncomingStreams),
@@ -561,6 +573,18 @@ func (svr *Service) HandleQUICListener(l *quic.Listener) {
 					_ = frpConn.CloseWithError(0, "")
 					return
 				}
+				// --- 主动探测防御 ---
+				buf := make([]byte, 8)
+				stream.SetReadDeadline(time.Now().Add(2 * time.Second))
+				n, _ := stream.Read(buf)
+				stream.SetReadDeadline(time.Time{})
+				if n < 4 || string(buf[:4]) != "GET " {
+					log.Warnf("[QUIC防御] 非法或探测流量，已拒绝: %q", buf[:n])
+					stream.Close()
+					continue
+				}
+				// --- END ---
+				// 继续正常处理
 				go svr.handleConnection(ctx, netpkg.QuicStreamToNetConn(stream, frpConn), false)
 			}
 		}(context.Background(), c)
