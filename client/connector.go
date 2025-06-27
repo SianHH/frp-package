@@ -17,13 +17,14 @@ package client
 import (
 	"context"
 	"crypto/tls"
-	"github.com/SianHH/frp-package/pkg/util/bbr"
 	"io"
 	"net"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/SianHH/frp-package/pkg/util/bbr"
 
 	quic "github.com/apernet/quic-go"
 	libnet "github.com/fatedier/golib/net"
@@ -88,7 +89,7 @@ func (c *defaultConnectorImpl) Open() error {
 			xl.Warnf("fail to build tls configuration, err: %v", err)
 			return err
 		}
-		tlsConfig.NextProtos = []string{"frp"}
+		tlsConfig.NextProtos = []string{"h3", "http/1.1"} // 统一为HTTPS协议伪装
 
 		conn, err := quic.DialAddr(
 			c.ctx,
