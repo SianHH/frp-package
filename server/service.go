@@ -438,13 +438,30 @@ func (svr *Service) handleConnection(ctx context.Context, conn net.Conn, interna
 		err    error
 	)
 
-	_ = conn.SetReadDeadline(time.Now().Add(connReadTimeout))
+	// 兼容：如果前面是HTTP/3头部（如GET ...\r\n），则跳过一行
+	peekBuf := make([]byte, 4)
+	conn.SetReadDeadline(time.Now().Add(connReadTimeout))
+	n, err := conn.Read(peekBuf)
+	if err == nil && n == 4 && string(peekBuf) == "GET " {
+		// 跳过整行HTTP/3请求头
+		for {
+			b := make([]byte, 1)
+			_, err := conn.Read(b)
+			if err != nil || b[0] == '\n' {
+				break
+			}
+		}
+	} else if err == nil && n > 0 {
+		// 如果不是GET，放回去
+		conn = netpkg.NewPrependConn(conn, peekBuf[:n])
+	}
+	conn.SetReadDeadline(time.Now().Add(connReadTimeout))
 	if rawMsg, err = msg.ReadMsg(conn); err != nil {
 		log.Tracef("failed to read message: %v", err)
 		conn.Close()
 		return
 	}
-	_ = conn.SetReadDeadline(time.Time{})
+	conn.SetReadDeadline(time.Time{})
 
 	switch m := rawMsg.(type) {
 	case *msg.Login:
