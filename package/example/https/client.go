@@ -1,0 +1,66 @@
+package main
+
+import (
+	"github.com/SianHH/frp-package/package/frpc"
+	"github.com/SianHH/frp-package/pkg/config/types"
+	v1 "github.com/SianHH/frp-package/pkg/config/v1"
+	"log"
+)
+
+func main() {
+	svc := frpc.NewService(v1.ClientCommonConfig{
+		Auth: v1.AuthClientConfig{
+			Token: "123123123",
+		},
+		User:       "",
+		ServerAddr: "127.0.0.1",
+		ServerPort: 7000,
+		Transport: v1.ClientTransportConfig{
+			Protocol: "tcp",
+		},
+	}, []v1.ProxyConfigurer{
+		&v1.HTTPSProxyConfig{
+			ProxyBaseConfig: v1.ProxyBaseConfig{
+				Name:        "111",
+				Type:        "https",
+				Annotations: nil,
+				Transport: v1.ProxyTransport{
+					UseEncryption:  true,
+					UseCompression: true,
+					BandwidthLimit: func() types.BandwidthQuantity {
+						quantity, _ := types.NewBandwidthQuantity("128KB")
+						return quantity
+					}(),
+					BandwidthLimitMode:   "client",
+					ProxyProtocolVersion: "",
+				},
+				Metadatas:    nil,
+				LoadBalancer: v1.LoadBalancerConfig{},
+				HealthCheck:  v1.HealthCheckConfig{},
+				ProxyBackend: v1.ProxyBackend{
+					LocalIP:   "192.168.0.172",
+					LocalPort: 22714,
+					Plugin: v1.TypedClientPluginOptions{
+						Type: "http2https",
+						ClientPluginOptions: &v1.HTTP2HTTPSPluginOptions{
+							Type:              "http2https",
+							LocalAddr:         "192.168.0.172:22714",
+							HostHeaderRewrite: "127.0.0.1",
+							RequestHeaders:    v1.HeaderOperations{},
+						},
+					},
+				},
+			},
+			DomainConfig: v1.DomainConfig{
+				CustomDomains: []string{
+					"aaa.example.com",
+				},
+			},
+		},
+	}, []v1.VisitorConfigurer{})
+
+	if err := svc.Start(); err != nil {
+		log.Fatalln(err)
+	}
+	svc.Wait()
+}
