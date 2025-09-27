@@ -38,6 +38,15 @@ type Service struct {
 	plugins  []plugin.Plugin
 }
 
+func (s *Service) RefreshPlugins(p []plugin.Plugin) {
+	s.plugins = p
+	pm := plugin.NewManager()
+	for _, item := range p {
+		pm.Register(item)
+	}
+	s.svc.SetPluginManger(pm)
+}
+
 func NewService(cfg v1.ServerConfig, opts ...Option) (*Service, error) {
 	s := &Service{
 		cfg:      cfg,

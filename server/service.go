@@ -347,6 +347,10 @@ func (svr *Service) GetPluginManager() *plugin.Manager {
 	return svr.pluginManager
 }
 
+func (svr *Service) SetPluginManger(pm *plugin.Manager) {
+	svr.pluginManager = pm
+}
+
 func (svr *Service) Run(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	svr.ctx = ctx
