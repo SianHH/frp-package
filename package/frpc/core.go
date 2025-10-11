@@ -13,7 +13,8 @@ type Option func(s *Service) error
 
 func FromBytes(data []byte) Option {
 	return func(s *Service) error {
-		cfg, proxyCfgs, visitorCfgs, _, err := LoadClientConfig(data, true)
+		// 不启用严格模式，尽量适配配置内容
+		cfg, proxyCfgs, visitorCfgs, _, err := LoadClientConfig(data, false)
 		if err != nil {
 			return err
 		}

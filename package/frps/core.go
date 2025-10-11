@@ -11,7 +11,8 @@ type Option func(s *Service) error
 
 func FromBytes(data []byte) Option {
 	return func(s *Service) error {
-		svrCfg, _, err := LoadServerConfig(data, true)
+		// 不启用严格模式，尽量适配配置内容
+		svrCfg, _, err := LoadServerConfig(data, false)
 		if err != nil {
 			return err
 		}
