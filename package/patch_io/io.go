@@ -14,7 +14,7 @@
 
 package patch_io
 
-// patch 实现暴露实时统计流量hook，实现长连接情况下，依然能够正常更新流量
+// patch 暴露统计流量hook，实现tcp长连接情况下，能够实时更新流量
 // "github.com/fatedier/golib/io"
 
 import (

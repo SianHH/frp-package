@@ -15,10 +15,12 @@
 package proxy
 
 import (
+	"github.com/SianHH/frp-package/package/patch_conn"
 	"io"
 	"net"
 	"reflect"
 	"strings"
+	"time"
 
 	libio "github.com/fatedier/golib/io"
 
@@ -182,7 +184,13 @@ func (pxy *HTTPProxy) GetRealConn(remoteAddr string) (workConn net.Conn, err err
 	}
 
 	workConn = netpkg.WrapReadWriteCloserToConn(rwc, tmpConn)
-	workConn = netpkg.WrapStatsConn(workConn, pxy.updateStatsAfterClosedConn)
+	// 修改HTTP PROXY实时统计流量
+	//workConn = netpkg.WrapStatsConn(workConn, pxy.updateStatsAfterClosedConn)
+	workConn = patch_conn.WrapStatsConn(workConn, pxy.updateStatsAfterClosedConn, func() {
+		name := pxy.GetName()
+		proxyType := pxy.GetConfigurer().GetBaseConfig().Type
+		metrics.Server.CloseConnection(name, proxyType)
+	}, time.Second*5)
 	metrics.Server.OpenConnection(pxy.GetName(), pxy.GetConfigurer().GetBaseConfig().Type)
 	return
 }
@@ -190,9 +198,13 @@ func (pxy *HTTPProxy) GetRealConn(remoteAddr string) (workConn net.Conn, err err
 func (pxy *HTTPProxy) updateStatsAfterClosedConn(totalRead, totalWrite int64) {
 	name := pxy.GetName()
 	proxyType := pxy.GetConfigurer().GetBaseConfig().Type
-	metrics.Server.CloseConnection(name, proxyType)
-	metrics.Server.AddTrafficIn(name, proxyType, totalWrite)
-	metrics.Server.AddTrafficOut(name, proxyType, totalRead)
+	//metrics.Server.CloseConnection(name, proxyType)
+	if totalWrite > 0 {
+		metrics.Server.AddTrafficIn(name, proxyType, totalWrite)
+	}
+	if totalRead > 0 {
+		metrics.Server.AddTrafficOut(name, proxyType, totalRead)
+	}
 }
 
 func (pxy *HTTPProxy) Close() {
