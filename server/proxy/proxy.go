@@ -17,6 +17,7 @@ package proxy
 import (
 	"context"
 	"fmt"
+	patch_io "github.com/SianHH/frp-package/package/patch"
 	"io"
 	"net"
 	"reflect"
@@ -264,10 +265,16 @@ func (pxy *BaseProxy) handleUserTCPConnection(userConn net.Conn) {
 	name := pxy.GetName()
 	proxyType := cfg.Type
 	metrics.Server.OpenConnection(name, proxyType)
-	inCount, outCount, _ := libio.Join(local, userConn)
+	//inCount, outCount, _ := libio.Join(local, userConn)
+	// patch libio.Join
+	_, _, _ = patch_io.Join(local, userConn, func(i int64) {
+		metrics.Server.AddTrafficIn(name, proxyType, i)
+	}, func(i int64) {
+		metrics.Server.AddTrafficOut(name, proxyType, i)
+	})
 	metrics.Server.CloseConnection(name, proxyType)
-	metrics.Server.AddTrafficIn(name, proxyType, inCount)
-	metrics.Server.AddTrafficOut(name, proxyType, outCount)
+	//metrics.Server.AddTrafficIn(name, proxyType, inCount)
+	//metrics.Server.AddTrafficOut(name, proxyType, outCount)
 	xl.Debugf("join connections closed")
 }
 
