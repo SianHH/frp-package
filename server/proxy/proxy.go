@@ -17,7 +17,7 @@ package proxy
 import (
 	"context"
 	"fmt"
-	patch_io "github.com/SianHH/frp-package/package/patch"
+	patch_io "github.com/SianHH/frp-package/package/patch_io"
 	"io"
 	"net"
 	"reflect"
