@@ -224,6 +224,8 @@ func (pxy *BaseProxy) handleUserTCPConnection(userConn net.Conn) {
 		ProxyType:  cfg.Type,
 		RemoteAddr: userConn.RemoteAddr().String(),
 	}
+	// TODO PATCH 用户连接关闭
+	defer rc.PluginManager.CloseUserConn(content)
 	_, err := rc.PluginManager.NewUserConn(content)
 	if err != nil {
 		xl.Warnf("the user conn [%s] was rejected, err:%v", content.RemoteAddr, err)

@@ -25,12 +25,13 @@ import (
 )
 
 type Manager struct {
-	loginPlugins       []Plugin
-	newProxyPlugins    []Plugin
-	closeProxyPlugins  []Plugin
-	pingPlugins        []Plugin
-	newWorkConnPlugins []Plugin
-	newUserConnPlugins []Plugin
+	loginPlugins         []Plugin
+	newProxyPlugins      []Plugin
+	closeProxyPlugins    []Plugin
+	pingPlugins          []Plugin
+	newWorkConnPlugins   []Plugin
+	newUserConnPlugins   []Plugin
+	closeUserConnPlugins []Plugin
 }
 
 func NewManager() *Manager {
@@ -62,6 +63,9 @@ func (m *Manager) Register(p Plugin) {
 	}
 	if p.IsSupport(OpNewUserConn) {
 		m.newUserConnPlugins = append(m.newUserConnPlugins, p)
+	}
+	if p.IsSupport(OpCloseUserConn) {
+		m.closeUserConnPlugins = append(m.closeUserConnPlugins, p)
 	}
 }
 
@@ -258,4 +262,18 @@ func (m *Manager) NewUserConn(content *NewUserConnContent) (*NewUserConnContent,
 		}
 	}
 	return content, nil
+}
+
+func (m *Manager) CloseUserConn(content *NewUserConnContent) {
+	if len(m.closeUserConnPlugins) == 0 {
+		return
+	}
+	reqid, _ := util.RandID()
+	xl := xlog.New().AppendPrefix("reqid: " + reqid)
+	ctx := xlog.NewContext(context.Background(), xl)
+	ctx = NewReqidContext(ctx, reqid)
+
+	for _, p := range m.closeUserConnPlugins {
+		p.Handle(ctx, OpCloseUserConn, *content)
+	}
 }
