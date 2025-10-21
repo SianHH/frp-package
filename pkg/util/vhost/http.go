@@ -308,7 +308,7 @@ func parseBasicAuth(auth string) (username, password string, ok bool) {
 	return cs[:s], cs[s+1:], true
 }
 
-func (rp *HTTPReverseProxy) injectRequestInfoToCtx(req *http.Request) (*http.Request, error) {
+func (rp *HTTPReverseProxy) injectRequestInfoToCtx(req *http.Request) *http.Request {
 	user := ""
 	// If url host isn't empty, it's a proxy request. Get http user from Proxy-Authorization header.
 	if req.URL.Host != "" {
@@ -332,18 +332,10 @@ func (rp *HTTPReverseProxy) injectRequestInfoToCtx(req *http.Request) (*http.Req
 	originalHost, _ := httppkg.CanonicalHost(reqRouteInfo.Host)
 	rc := rp.GetRouteConfig(originalHost, reqRouteInfo.URL, reqRouteInfo.HTTPUser)
 
-	if rc == nil {
-		return nil, errors.New("route is not found")
-	}
-
-	if !rp.limiterManager.Allow(rc.ProxyName) {
-		return nil, errors.New(http.StatusText(http.StatusTooManyRequests))
-	}
-
 	newctx := req.Context()
 	newctx = context.WithValue(newctx, RouteInfoKey, reqRouteInfo)
 	newctx = context.WithValue(newctx, RouteConfigKey, rc)
-	return req.Clone(newctx), nil
+	return req.Clone(newctx)
 }
 
 func (rp *HTTPReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -356,12 +348,22 @@ func (rp *HTTPReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	newreq, err := rp.injectRequestInfoToCtx(req)
-	if err != nil {
-		http.Error(rw, err.Error(), http.StatusBadRequest)
+	// 查询不到路由信息返回404
+	originalHost, _ := httppkg.CanonicalHost(req.Host)
+	rc := rp.GetRouteConfig(originalHost, req.URL.Path, user)
+	if rc == nil {
+		rw.WriteHeader(http.StatusNotFound)
+		_, _ = rw.Write(getNotFoundPageContent())
 		return
 	}
 
+	// 请求QOS判断
+	if !rp.limiterManager.Allow(rc.ProxyName) {
+		http.Error(rw, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
+		return
+	}
+
+	newreq := rp.injectRequestInfoToCtx(req)
 	if req.Method == http.MethodConnect {
 		rp.connectHandler(rw, newreq)
 	} else {
