@@ -56,6 +56,7 @@ var (
 		splugin.OpNewWorkConn,
 		splugin.OpNewUserConn,
 		splugin.OpCloseUserConn,
+		splugin.OpGetHttpQosConfig,
 	}
 )
 

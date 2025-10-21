@@ -25,23 +25,26 @@ import (
 )
 
 type Manager struct {
-	loginPlugins         []Plugin
-	newProxyPlugins      []Plugin
-	closeProxyPlugins    []Plugin
-	pingPlugins          []Plugin
-	newWorkConnPlugins   []Plugin
-	newUserConnPlugins   []Plugin
-	closeUserConnPlugins []Plugin
+	loginPlugins            []Plugin
+	newProxyPlugins         []Plugin
+	closeProxyPlugins       []Plugin
+	pingPlugins             []Plugin
+	newWorkConnPlugins      []Plugin
+	newUserConnPlugins      []Plugin
+	closeUserConnPlugins    []Plugin
+	getHttpQosConfigPlugins []Plugin
 }
 
 func NewManager() *Manager {
 	return &Manager{
-		loginPlugins:       make([]Plugin, 0),
-		newProxyPlugins:    make([]Plugin, 0),
-		closeProxyPlugins:  make([]Plugin, 0),
-		pingPlugins:        make([]Plugin, 0),
-		newWorkConnPlugins: make([]Plugin, 0),
-		newUserConnPlugins: make([]Plugin, 0),
+		loginPlugins:            make([]Plugin, 0),
+		newProxyPlugins:         make([]Plugin, 0),
+		closeProxyPlugins:       make([]Plugin, 0),
+		pingPlugins:             make([]Plugin, 0),
+		newWorkConnPlugins:      make([]Plugin, 0),
+		newUserConnPlugins:      make([]Plugin, 0),
+		closeUserConnPlugins:    make([]Plugin, 0),
+		getHttpQosConfigPlugins: make([]Plugin, 0),
 	}
 }
 
@@ -66,6 +69,9 @@ func (m *Manager) Register(p Plugin) {
 	}
 	if p.IsSupport(OpCloseUserConn) {
 		m.closeUserConnPlugins = append(m.closeUserConnPlugins, p)
+	}
+	if p.IsSupport(OpGetHttpQosConfig) {
+		m.getHttpQosConfigPlugins = append(m.getHttpQosConfigPlugins, p)
 	}
 }
 
@@ -274,6 +280,37 @@ func (m *Manager) CloseUserConn(content *NewUserConnContent) {
 	ctx = NewReqidContext(ctx, reqid)
 
 	for _, p := range m.closeUserConnPlugins {
-		p.Handle(ctx, OpCloseUserConn, *content)
+		_, _, _ = p.Handle(ctx, OpCloseUserConn, *content)
 	}
+}
+
+func (m *Manager) GetHttpQosConfig(content *GetHttpQosConfigContent) (*GetHttpQosConfigContent, error) {
+	if len(m.getHttpQosConfigPlugins) == 0 {
+		return nil, nil
+	}
+	var (
+		res = &Response{
+			Reject:   false,
+			Unchange: true,
+		}
+		retContent any
+		err        error
+	)
+	reqid, _ := util.RandID()
+	xl := xlog.New().AppendPrefix("reqid: " + reqid)
+	ctx := xlog.NewContext(context.Background(), xl)
+	ctx = NewReqidContext(ctx, reqid)
+
+	for _, p := range m.getHttpQosConfigPlugins {
+		res, retContent, err = p.Handle(ctx, OpGetHttpQosConfig, *content)
+		if err != nil {
+			xl.Infof("send GetHttpQosConfig request to plugin [%s] error: %v", p.Name(), err)
+			return nil, errors.New("send GetHttpQosConfig request to plugin error")
+		}
+		if res.Reject {
+			return nil, fmt.Errorf("%s", res.RejectReason)
+		}
+		content = retContent.(*GetHttpQosConfigContent)
+	}
+	return content, nil
 }

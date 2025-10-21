@@ -86,6 +86,7 @@ func (pxy *HTTPProxy) Run() (remoteAddr string, err error) {
 		routeConfig.Domain = domain
 		for _, location := range locations {
 			routeConfig.Location = location
+			routeConfig.ProxyName = pxy.name
 
 			tmpRouteConfig := routeConfig
 
@@ -119,6 +120,7 @@ func (pxy *HTTPProxy) Run() (remoteAddr string, err error) {
 		routeConfig.Domain = pxy.cfg.SubDomain + "." + pxy.serverCfg.SubDomainHost
 		for _, location := range locations {
 			routeConfig.Location = location
+			routeConfig.ProxyName = pxy.name
 
 			tmpRouteConfig := routeConfig
 

@@ -282,6 +282,10 @@ func NewService(cfg *v1.ServerConfig) (*Service, error) {
 	if cfg.VhostHTTPPort > 0 {
 		rp := vhost.NewHTTPReverseProxy(vhost.HTTPReverseProxyOptions{
 			ResponseHeaderTimeoutS: cfg.VhostHTTPTimeout,
+			// PATCH 暴露frps plugin.Manager
+			GetPlugins: func() *plugin.Manager {
+				return svr.pluginManager
+			},
 		}, svr.httpVhostRouter)
 		svr.rc.HTTPReverseProxy = rp
 

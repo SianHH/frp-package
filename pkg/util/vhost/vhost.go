@@ -121,6 +121,8 @@ type RouteConfig struct {
 	ResponseHeaders map[string]string
 	RouteByHTTPUser string
 
+	ProxyName string // PATCH 添加隧道名称
+
 	CreateConnFn           CreateConnFunc
 	ChooseEndpointFn       ChooseEndpointFunc
 	CreateConnByEndpointFn CreateConnByEndpointFunc

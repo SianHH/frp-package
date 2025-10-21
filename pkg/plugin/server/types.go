@@ -69,3 +69,8 @@ type NewUserConnContent struct {
 	ProxyType  string   `json:"proxy_type"`
 	RemoteAddr string   `json:"remote_addr"`
 }
+
+type GetHttpQosConfigContent struct {
+	ProxyName string `json:"proxy_name"`
+	Limiter   int    `json:"limiter"`
+}

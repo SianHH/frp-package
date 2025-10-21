@@ -19,6 +19,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/SianHH/frp-package/package/pkg/qos"
+	plugin "github.com/SianHH/frp-package/pkg/plugin/server"
 	stdlog "log"
 	"net"
 	"net/http"
@@ -40,11 +42,15 @@ var ErrNoRouteFound = errors.New("no route found")
 
 type HTTPReverseProxyOptions struct {
 	ResponseHeaderTimeoutS int64
+	GetPlugins             func() *plugin.Manager
 }
 
 type HTTPReverseProxy struct {
 	proxy       http.Handler
 	vhostRouter *Routers
+
+	GetPlugins     func() *plugin.Manager
+	limiterManager *qos.LimiterManager
 
 	responseHeaderTimeout time.Duration
 }
@@ -56,7 +62,25 @@ func NewHTTPReverseProxy(option HTTPReverseProxyOptions, vhostRouter *Routers) *
 	rp := &HTTPReverseProxy{
 		responseHeaderTimeout: time.Duration(option.ResponseHeaderTimeoutS) * time.Second,
 		vhostRouter:           vhostRouter,
+		GetPlugins:            option.GetPlugins,
 	}
+	// PATCH 添加定时加载限速配置策略
+	rp.limiterManager = qos.NewLimiterManager(time.Second*30, time.Hour*24, func(proxyName string) (cfg qos.QosConfig, err error) {
+		if rp.GetPlugins != nil {
+			plugins := rp.GetPlugins()
+			qosCfg, err := plugins.GetHttpQosConfig(&plugin.GetHttpQosConfigContent{
+				ProxyName: proxyName,
+			})
+			if err != nil || qosCfg == nil {
+				return cfg, err
+			}
+			cfg.RPS = qosCfg.Limiter
+			cfg.Burst = qosCfg.Limiter
+			return cfg, nil
+		} else {
+			return cfg, nil
+		}
+	})
 	proxy := &httputil.ReverseProxy{
 		// Modify incoming requests by route policies.
 		Rewrite: func(r *httputil.ProxyRequest) {
@@ -284,7 +308,7 @@ func parseBasicAuth(auth string) (username, password string, ok bool) {
 	return cs[:s], cs[s+1:], true
 }
 
-func (rp *HTTPReverseProxy) injectRequestInfoToCtx(req *http.Request) *http.Request {
+func (rp *HTTPReverseProxy) injectRequestInfoToCtx(req *http.Request) (*http.Request, error) {
 	user := ""
 	// If url host isn't empty, it's a proxy request. Get http user from Proxy-Authorization header.
 	if req.URL.Host != "" {
@@ -308,10 +332,18 @@ func (rp *HTTPReverseProxy) injectRequestInfoToCtx(req *http.Request) *http.Requ
 	originalHost, _ := httppkg.CanonicalHost(reqRouteInfo.Host)
 	rc := rp.GetRouteConfig(originalHost, reqRouteInfo.URL, reqRouteInfo.HTTPUser)
 
+	if rc == nil {
+		return nil, errors.New("route is not found")
+	}
+
+	if !rp.limiterManager.Allow(rc.ProxyName) {
+		return nil, errors.New(http.StatusText(http.StatusTooManyRequests))
+	}
+
 	newctx := req.Context()
 	newctx = context.WithValue(newctx, RouteInfoKey, reqRouteInfo)
 	newctx = context.WithValue(newctx, RouteConfigKey, rc)
-	return req.Clone(newctx)
+	return req.Clone(newctx), nil
 }
 
 func (rp *HTTPReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -324,10 +356,20 @@ func (rp *HTTPReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	newreq := rp.injectRequestInfoToCtx(req)
+	newreq, err := rp.injectRequestInfoToCtx(req)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	if req.Method == http.MethodConnect {
 		rp.connectHandler(rw, newreq)
 	} else {
 		rp.proxy.ServeHTTP(rw, newreq)
 	}
+}
+
+// PATCH 清理limiter资源
+func (rp *HTTPReverseProxy) Clean() {
+	rp.limiterManager.Destroy()
 }
