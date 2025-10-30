@@ -71,12 +71,12 @@ func NewHTTPReverseProxy(option HTTPReverseProxyOptions, vhostRouter *Routers) *
 			qosCfg, err := plugins.GetHttpQosConfig(&plugin.GetHttpQosConfigContent{
 				ProxyName: proxyName,
 			})
-			if err != nil || qosCfg == nil {
-				return cfg, err
+			if qosCfg == nil {
+				qosCfg = &plugin.GetHttpQosConfigContent{}
 			}
 			cfg.RPS = qosCfg.Limiter
 			cfg.Burst = qosCfg.Limiter
-			return cfg, nil
+			return cfg, err
 		} else {
 			return cfg, nil
 		}

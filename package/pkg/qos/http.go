@@ -1,6 +1,8 @@
 package qos
 
 import (
+	"errors"
+	"github.com/SianHH/frp-package/pkg/plugin/server"
 	"golang.org/x/time/rate"
 	"sync"
 	"time"
@@ -66,19 +68,32 @@ func (m *LimiterManager) GetLimiter(tunnel string) *rate.Limiter {
 // refreshLimiter 异步加载或更新配置
 func (m *LimiterManager) refreshLimiter(key string) {
 	cfg, err := m.loadConfig(key)
+	oldLimiter := m.GetLimiter(key)
 	var limiter *rate.Limiter
 	var entry *LimiterEntry
 	if err != nil {
-		limiter = rate.NewLimiter(0, 0)
-		entry = &LimiterEntry{
-			limiter:    limiter,
-			lastUpdate: time.Now(),
-			lastUsed:   time.Now(),
+		if errors.Is(err, server.ErrorPluginsSendFail) {
+			// 如果是网络原因导致的，依然采用旧的Limiter
+			entry = &LimiterEntry{
+				limiter:    oldLimiter,
+				lastUpdate: time.Now(),
+				lastUsed:   time.Now(),
+			}
+		} else {
+			// 否则就不允许请求
+			limiter = rate.NewLimiter(0, 0)
+			entry = &LimiterEntry{
+				limiter:    limiter,
+				lastUpdate: time.Now(),
+				lastUsed:   time.Now(),
+			}
 		}
 	} else {
 		if cfg.RPS == 0 && cfg.Burst == 0 {
+			// 如果都是0，则不限制
 			limiter = rate.NewLimiter(rate.Inf, 0)
 		} else {
+			// 否则按返回的配置设置限速器
 			limiter = rate.NewLimiter(rate.Limit(cfg.RPS), cfg.Burst)
 		}
 		entry = &LimiterEntry{

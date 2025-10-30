@@ -24,6 +24,10 @@ import (
 	"github.com/SianHH/frp-package/pkg/util/xlog"
 )
 
+var (
+	ErrorPluginsSendFail = errors.New("plugins send fail") // 发送Plugins失败
+)
+
 type Manager struct {
 	loginPlugins            []Plugin
 	newProxyPlugins         []Plugin
@@ -305,7 +309,7 @@ func (m *Manager) GetHttpQosConfig(content *GetHttpQosConfigContent) (*GetHttpQo
 		res, retContent, err = p.Handle(ctx, OpGetHttpQosConfig, *content)
 		if err != nil {
 			xl.Infof("send GetHttpQosConfig request to plugin [%s] error: %v", p.Name(), err)
-			return nil, errors.New("send GetHttpQosConfig request to plugin error")
+			return nil, ErrorPluginsSendFail
 		}
 		if res.Reject {
 			return nil, fmt.Errorf("%s", res.RejectReason)
