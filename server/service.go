@@ -352,7 +352,7 @@ func (svr *Service) GetPluginManager() *plugin.Manager {
 }
 
 func (svr *Service) SetPluginManger(pm *plugin.Manager) {
-	svr.pluginManager = pm
+	*svr.pluginManager = *pm
 }
 
 func (svr *Service) Run(ctx context.Context) {
