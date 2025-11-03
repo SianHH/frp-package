@@ -74,9 +74,5 @@ func (rc *ResourceController) Close() error {
 	if rc.TCPMuxHTTPConnectMuxer != nil {
 		rc.TCPMuxHTTPConnectMuxer.Close()
 	}
-	// PATCH 清理资源
-	if rc.HTTPReverseProxy != nil {
-		rc.HTTPReverseProxy.Clean()
-	}
 	return nil
 }

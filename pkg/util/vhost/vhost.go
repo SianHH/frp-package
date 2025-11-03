@@ -15,6 +15,7 @@ package vhost
 import (
 	"context"
 	"fmt"
+	"golang.org/x/time/rate"
 	"net"
 	"strings"
 	"time"
@@ -121,7 +122,7 @@ type RouteConfig struct {
 	ResponseHeaders map[string]string
 	RouteByHTTPUser string
 
-	ProxyName string // PATCH 添加隧道名称
+	RLimiter *rate.Limiter // PATCH HTTP:并发请求熟虑
 
 	CreateConnFn           CreateConnFunc
 	ChooseEndpointFn       ChooseEndpointFunc

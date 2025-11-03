@@ -19,8 +19,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/SianHH/frp-package/package/pkg/qos"
-	plugin "github.com/SianHH/frp-package/pkg/plugin/server"
 	stdlog "log"
 	"net"
 	"net/http"
@@ -42,15 +40,11 @@ var ErrNoRouteFound = errors.New("no route found")
 
 type HTTPReverseProxyOptions struct {
 	ResponseHeaderTimeoutS int64
-	GetPlugins             func() *plugin.Manager
 }
 
 type HTTPReverseProxy struct {
 	proxy       http.Handler
 	vhostRouter *Routers
-
-	GetPlugins     func() *plugin.Manager
-	limiterManager *qos.LimiterManager
 
 	responseHeaderTimeout time.Duration
 }
@@ -62,25 +56,7 @@ func NewHTTPReverseProxy(option HTTPReverseProxyOptions, vhostRouter *Routers) *
 	rp := &HTTPReverseProxy{
 		responseHeaderTimeout: time.Duration(option.ResponseHeaderTimeoutS) * time.Second,
 		vhostRouter:           vhostRouter,
-		GetPlugins:            option.GetPlugins,
 	}
-	// PATCH 添加定时加载限速配置策略
-	rp.limiterManager = qos.NewLimiterManager(time.Second*30, time.Hour*24, func(proxyName string) (cfg qos.QosConfig, err error) {
-		if rp.GetPlugins != nil {
-			plugins := rp.GetPlugins()
-			qosCfg, err := plugins.GetHttpQosConfig(&plugin.GetHttpQosConfigContent{
-				ProxyName: proxyName,
-			})
-			if qosCfg == nil {
-				qosCfg = &plugin.GetHttpQosConfigContent{}
-			}
-			cfg.RPS = qosCfg.Limiter
-			cfg.Burst = qosCfg.Limiter
-			return cfg, err
-		} else {
-			return cfg, nil
-		}
-	})
 	proxy := &httputil.ReverseProxy{
 		// Modify incoming requests by route policies.
 		Rewrite: func(r *httputil.ProxyRequest) {
@@ -357,10 +333,11 @@ func (rp *HTTPReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	// 请求QOS判断
-	if !rp.limiterManager.Allow(rc.ProxyName) {
-		http.Error(rw, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
-		return
+	if rc.RLimiter != nil {
+		if !rc.RLimiter.Allow() {
+			http.Error(rw, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
+			return
+		}
 	}
 
 	newreq := rp.injectRequestInfoToCtx(req)
@@ -369,9 +346,4 @@ func (rp *HTTPReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 	} else {
 		rp.proxy.ServeHTTP(rw, newreq)
 	}
-}
-
-// PATCH 清理limiter资源
-func (rp *HTTPReverseProxy) Clean() {
-	rp.limiterManager.Destroy()
 }

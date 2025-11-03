@@ -24,10 +24,6 @@ import (
 	"github.com/SianHH/frp-package/pkg/util/xlog"
 )
 
-var (
-	ErrorPluginsSendFail = errors.New("plugins send fail") // 发送Plugins失败
-)
-
 type Manager struct {
 	loginPlugins            []Plugin
 	newProxyPlugins         []Plugin
@@ -41,14 +37,12 @@ type Manager struct {
 
 func NewManager() *Manager {
 	return &Manager{
-		loginPlugins:            make([]Plugin, 0),
-		newProxyPlugins:         make([]Plugin, 0),
-		closeProxyPlugins:       make([]Plugin, 0),
-		pingPlugins:             make([]Plugin, 0),
-		newWorkConnPlugins:      make([]Plugin, 0),
-		newUserConnPlugins:      make([]Plugin, 0),
-		closeUserConnPlugins:    make([]Plugin, 0),
-		getHttpQosConfigPlugins: make([]Plugin, 0),
+		loginPlugins:       make([]Plugin, 0),
+		newProxyPlugins:    make([]Plugin, 0),
+		closeProxyPlugins:  make([]Plugin, 0),
+		pingPlugins:        make([]Plugin, 0),
+		newWorkConnPlugins: make([]Plugin, 0),
+		newUserConnPlugins: make([]Plugin, 0),
 	}
 }
 
@@ -70,12 +64,6 @@ func (m *Manager) Register(p Plugin) {
 	}
 	if p.IsSupport(OpNewUserConn) {
 		m.newUserConnPlugins = append(m.newUserConnPlugins, p)
-	}
-	if p.IsSupport(OpCloseUserConn) {
-		m.closeUserConnPlugins = append(m.closeUserConnPlugins, p)
-	}
-	if p.IsSupport(OpGetHttpQosConfig) {
-		m.getHttpQosConfigPlugins = append(m.getHttpQosConfigPlugins, p)
 	}
 }
 
@@ -270,51 +258,6 @@ func (m *Manager) NewUserConn(content *NewUserConnContent) (*NewUserConnContent,
 		if !res.Unchange {
 			content = retContent.(*NewUserConnContent)
 		}
-	}
-	return content, nil
-}
-
-func (m *Manager) CloseUserConn(content *NewUserConnContent) {
-	if len(m.closeUserConnPlugins) == 0 {
-		return
-	}
-	reqid, _ := util.RandID()
-	xl := xlog.New().AppendPrefix("reqid: " + reqid)
-	ctx := xlog.NewContext(context.Background(), xl)
-	ctx = NewReqidContext(ctx, reqid)
-
-	for _, p := range m.closeUserConnPlugins {
-		_, _, _ = p.Handle(ctx, OpCloseUserConn, *content)
-	}
-}
-
-func (m *Manager) GetHttpQosConfig(content *GetHttpQosConfigContent) (*GetHttpQosConfigContent, error) {
-	if len(m.getHttpQosConfigPlugins) == 0 {
-		return nil, nil
-	}
-	var (
-		res = &Response{
-			Reject:   false,
-			Unchange: true,
-		}
-		retContent any
-		err        error
-	)
-	reqid, _ := util.RandID()
-	xl := xlog.New().AppendPrefix("reqid: " + reqid)
-	ctx := xlog.NewContext(context.Background(), xl)
-	ctx = NewReqidContext(ctx, reqid)
-
-	for _, p := range m.getHttpQosConfigPlugins {
-		res, retContent, err = p.Handle(ctx, OpGetHttpQosConfig, *content)
-		if err != nil {
-			xl.Infof("send GetHttpQosConfig request to plugin [%s] error: %v", p.Name(), err)
-			return nil, ErrorPluginsSendFail
-		}
-		if res.Reject {
-			return nil, fmt.Errorf("%s", res.RejectReason)
-		}
-		content = retContent.(*GetHttpQosConfigContent)
 	}
 	return content, nil
 }

@@ -16,6 +16,7 @@ package proxy
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	patch_io "github.com/SianHH/frp-package/package/patch_io"
 	"io"
@@ -23,6 +24,7 @@ import (
 	"reflect"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	libio "github.com/fatedier/golib/io"
@@ -70,6 +72,10 @@ type BaseProxy struct {
 	getWorkConnFn GetWorkConnFn
 	serverCfg     *v1.ServerConfig
 	limiter       *rate.Limiter
+	rLimiter      *rate.Limiter       // PATCH TCP:并发连接数速率 HTTP:并发请求熟虑
+	maxConn       int64               // PATCH 最大连接数 仅TCP有效
+	currentConn   *atomic.Int64       // PATCH 当前连接数 仅TCP有效
+	ipSet         map[string]struct{} // PATCH IP白名单
 	userInfo      plugin.UserInfo
 	loginMsg      *msg.Login
 	configurer    v1.ProxyConfigurer
@@ -224,14 +230,35 @@ func (pxy *BaseProxy) handleUserTCPConnection(userConn net.Conn) {
 		ProxyType:  cfg.Type,
 		RemoteAddr: userConn.RemoteAddr().String(),
 	}
+
+	// PATCH 限制并发连接熟虑
+	if pxy.rLimiter != nil {
+		if !pxy.rLimiter.Allow() {
+			xl.Warnf("the user conn [%s] was rejected, err: limit connection rate", content.RemoteAddr)
+			return
+		}
+	}
+
+	// PATCH 限制最大连接数量
+	if pxy.maxConn != 0 && pxy.currentConn.Load() >= pxy.maxConn {
+		xl.Warnf("the user conn [%s] was rejected, err: maximum connection limit", content.RemoteAddr)
+		return
+	}
+
+	// PATCH IP白名单验证
+	if len(pxy.ipSet) > 0 {
+		host, _, _ := net.SplitHostPort(content.RemoteAddr)
+		if _, ok := pxy.ipSet[host]; !ok {
+			xl.Warnf("the user conn [%s] was rejected, err: not on the ip white list", content.RemoteAddr)
+			return
+		}
+	}
+
 	_, err := rc.PluginManager.NewUserConn(content)
 	if err != nil {
 		xl.Warnf("the user conn [%s] was rejected, err:%v", content.RemoteAddr, err)
 		return
 	}
-
-	// TODO PATCH 用户连接关闭
-	defer rc.PluginManager.CloseUserConn(content)
 
 	// try all connections from the pool
 	workConn, err := pxy.GetWorkConnFromPool(userConn.RemoteAddr(), userConn.LocalAddr())
@@ -239,6 +266,10 @@ func (pxy *BaseProxy) handleUserTCPConnection(userConn net.Conn) {
 		return
 	}
 	defer workConn.Close()
+
+	// PATCH 统计活跃连接数
+	pxy.currentConn.Add(1)
+	defer pxy.currentConn.Add(-1)
 
 	var local io.ReadWriteCloser = workConn
 	xl.Tracef("handler user tcp connection, use_encryption: %t, use_compression: %t",
@@ -301,6 +332,28 @@ func NewProxy(ctx context.Context, options *Options) (pxy Proxy, err error) {
 		limiter = rate.NewLimiter(rate.Limit(float64(limitBytes)), int(limitBytes))
 	}
 
+	// PATCH 限制请求速率
+	var rLimiter *rate.Limiter
+	rl, ok := configurer.GetBaseConfig().Metadatas["rLimiter"]
+	if ok {
+		rLimiterValue, _ := strconv.Atoi(rl)
+		if rLimiterValue > 0 {
+			rLimiter = rate.NewLimiter(rate.Limit(rLimiterValue), rLimiterValue)
+		}
+	}
+
+	// PATCH 限制最大连接数
+	maxConn, _ := strconv.ParseInt(configurer.GetBaseConfig().Metadatas["maxConn"], 10, 64)
+
+	// PATCH IP白名单
+	var ips []string
+	ipsString := configurer.GetBaseConfig().Metadatas["ipSet"]
+	_ = json.Unmarshal([]byte(ipsString), &ips)
+	var ipSet = make(map[string]struct{})
+	for _, ip := range ips {
+		ipSet[ip] = struct{}{}
+	}
+
 	basePxy := BaseProxy{
 		name:          configurer.GetBaseConfig().Name,
 		rc:            options.ResourceController,
@@ -309,6 +362,10 @@ func NewProxy(ctx context.Context, options *Options) (pxy Proxy, err error) {
 		getWorkConnFn: options.GetWorkConnFn,
 		serverCfg:     options.ServerCfg,
 		limiter:       limiter,
+		rLimiter:      rLimiter,
+		maxConn:       maxConn,
+		currentConn:   &atomic.Int64{},
+		ipSet:         ipSet,
 		xl:            xl,
 		ctx:           xlog.NewContext(ctx, xl),
 		userInfo:      options.UserInfo,
